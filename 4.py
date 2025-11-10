@@ -1,23 +1,18 @@
-import os
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-import plotly.express as px
-import networkx as nx
+import os, numpy as np, pandas as pd, seaborn as sns, matplotlib.pyplot as plt, plotly.express as px, networkx as nx
+from scipy.cluster.hierarchy import dendrogram, linkage
 
 OUTDIR = "outputs"
 os.makedirs(OUTDIR, exist_ok=True)
 
-def savefig(fig, name, dpi=150):
+def save(fig, name):
     path = os.path.join(OUTDIR, name)
-    fig.savefig(path, bbox_inches="tight", dpi=dpi)
+    fig.savefig(path, bbox_inches="tight", dpi=150)
     plt.close(fig)
     print("Saved:", path)
 
+# --- Datasets ---
 iris = sns.load_dataset('iris')
-df_iris = iris.frame
-df_iris['species'] = df_iris.target.apply(lambda x: iris.target_names[x])
+iris['species'] = iris['species'].astype(str)  # seaborn iris already has species names
 
 np.random.seed(42)
 df_adult = pd.DataFrame({
@@ -29,56 +24,50 @@ df_adult = pd.DataFrame({
     "year": np.random.choice(range(2000, 2020), 200)
 })
 
-fig = plt.figure(figsize=(7,4))
-sns.histplot(df_adult['age'], bins=20, kde=True, color="skyblue")
-plt.title("1D Distribution of Age (Adult Dataset)")
-savefig(fig, "adult_1d_hist_age.png")
+# --- 1D Histogram ---
+fig = sns.histplot(df_adult['age'], bins=20, kde=True, color="skyblue").get_figure()
+plt.title("Adult Age Distribution")
+save(fig, "adult_1d_hist_age.png")
 
-fig = plt.figure(figsize=(7,5))
-sns.scatterplot(data=df_iris, x="sepal length (cm)", y="sepal width (cm)", hue="species", palette="Set2")
-plt.title("2D Scatterplot of Iris Features")
-savefig(fig, "iris_2d_scatter.png")
+# --- 2D Scatter ---
+fig = sns.scatterplot(data=iris, x="sepal_length", y="sepal_width", hue="species", palette="Set2").get_figure()
+plt.title("Iris Sepal Scatter")
+save(fig, "iris_2d_scatter.png")
 
-fig3d = px.scatter_3d(
-    df_iris, 
-    x="sepal length (cm)", 
-    y="sepal width (cm)", 
-    z="petal length (cm)", 
-    color="species",
-    title="3D Iris Visualization"
-)
+# --- 3D Scatter ---
+fig3d = px.scatter_3d(iris, x="sepal_length", y="sepal_width", z="petal_length", color="species",
+                      title="Iris 3D Scatter")
 fig3d.write_image(os.path.join(OUTDIR, "iris_3d.png"))
 print("Saved:", os.path.join(OUTDIR, "iris_3d.png"))
 
+# --- Temporal Trend ---
 df_yearly = df_adult.groupby("year")["hours_per_week"].mean().reset_index()
-fig = plt.figure(figsize=(8,4))
-sns.lineplot(data=df_yearly, x="year", y="hours_per_week", marker="o")
-plt.title("Temporal Trend of Hours per Week (Adult Dataset)")
-savefig(fig, "adult_temporal_year_hours.png")
+fig = sns.lineplot(data=df_yearly, x="year", y="hours_per_week", marker="o").get_figure()
+plt.title("Average Hours per Week by Year")
+save(fig, "adult_temporal_year_hours.png")
 
-pair = sns.pairplot(df_iris, hue="species", diag_kind="kde")
-pair.fig.suptitle("Multidimensional Visualization of Iris Dataset", y=1.02)
-pair.savefig(os.path.join(OUTDIR, "iris_multidimensional_pairplot.png"))
+# --- Pairplot ---
+pair = sns.pairplot(iris, hue="species", diag_kind="kde")
+pair.fig.suptitle("Iris Pairplot", y=1.02)
+pair.savefig(os.path.join(OUTDIR, "iris_pairplot.png"))
 plt.close("all")
-print("Saved:", os.path.join(OUTDIR, "iris_multidimensional_pairplot.png"))
+print("Saved:", os.path.join(OUTDIR, "iris_pairplot.png"))
 
-from scipy.cluster.hierarchy import dendrogram, linkage
-X = df_iris[["sepal length (cm)", "sepal width (cm)", "petal length (cm)", "petal width (cm)"]]
-linked = linkage(X, method="ward")
-fig = plt.figure(figsize=(10, 5))
-dendrogram(linked, labels=df_iris['species'].values, leaf_rotation=90, leaf_font_size=8)
-plt.title("Hierarchical Clustering Dendrogram (Iris Dataset)")
-savefig(fig, "iris_dendrogram.png")
+# --- Dendrogram ---
+X = iris[["sepal_length","sepal_width","petal_length","petal_width"]]
+fig = plt.figure(figsize=(10,5))
+dendrogram(linkage(X, method="ward"), labels=iris['species'].values, leaf_rotation=90, leaf_font_size=8)
+plt.title("Iris Dendrogram")
+save(fig, "iris_dendrogram.png")
 
+# --- Network graph ---
 G = nx.Graph()
 for wc in df_adult['workclass'].unique():
     for inc in df_adult['income'].unique():
         G.add_edge(wc, inc, weight=np.random.randint(1,10))
-
 fig = plt.figure(figsize=(6,6))
-pos = nx.spring_layout(G)
-nx.draw(G, pos, with_labels=True, node_size=2000, node_color="lightgreen", font_size=12, width=2)
-plt.title("Network Visualization of Workclass vs Income")
-savefig(fig, "adult_network.png")
+nx.draw(G, nx.spring_layout(G), with_labels=True, node_size=2000, node_color="lightgreen", font_size=12, width=2)
+plt.title("Workclass vs Income Network")
+save(fig, "adult_network.png")
 
-print("✅ All visualizations saved inside:", OUTDIR)
+print("✅ All visualizations saved in", OUTDIR)
